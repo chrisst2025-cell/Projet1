@@ -1,92 +1,78 @@
+const axios = require("axios");
 const moment = require("moment-timezone");
 
 module.exports = {
-	config: {
-		name: "daily",
-		version: "1.2",
-		author: "NTKhang",
-		countDown: 5,
-		role: 0,
-		description: {
-			vi: "Nhận quà hàng ngày",
-			en: "Receive daily gift"
-		},
-		category: "game",
-		guide: {
-			vi: "   {pn}: Nhận quà hàng ngày"
-				+ "\n   {pn} info: Xem thông tin quà hàng ngày",
-			en: "   {pn}"
-				+ "\n   {pn} info: View daily gift information"
-		},
-		envConfig: {
-			rewardFirstDay: {
-				coin: 100,
-				exp: 10
-			}
-		}
-	},
+    config: {
+        name: "daily",
+        version: "1.0.0",
+        author: "S1F4T",
+        countDown: 5,
+        role: 0,
+        description: {
+            vi: "Nhận quà hàng ngày với giao diện ảnh",
+            en: "Receive daily rewards with only image interface"
+        },
+        category: "game",
+        guide: {
+            en: "   {pn}: Claim your daily reward"
+        },
+        envConfig: {
+            rewardFirstDay: { coin: 500, exp: 50 }
+        }
+    },
 
-	langs: {
-		vi: {
-			monday: "Thứ 2",
-			tuesday: "Thứ 3",
-			wednesday: "Thứ 4",
-			thursday: "Thứ 5",
-			friday: "Thứ 6",
-			saturday: "Thứ 7",
-			sunday: "Chủ nhật",
-			alreadyReceived: "Bạn đã nhận quà rồi",
-			received: "Bạn đã nhận được %1 coin và %2 exp"
-		},
-		en: {
-			monday: "Monday",
-			tuesday: "Tuesday",
-			wednesday: "Wednesday",
-			thursday: "Thursday",
-			friday: "Friday",
-			saturday: "Saturday",
-			sunday: "Sunday",
-			alreadyReceived: "You have already received the gift",
-			received: "You have received %1 coin and %2 exp"
-		}
-	},
+    onStart: async function ({ event, envCommands, usersData, api, message }) {
+        const { senderID } = event;
+        const reward = envCommands[this.config.name].rewardFirstDay;
+        const timeZone = "Asia/Dhaka";
+        const dateTime = moment.tz(timeZone).format("DD/MM/YYYY");
+        const currentDay = new Date().getDay();
+        const dayIndex = currentDay === 0 ? 7 : currentDay;
 
-	onStart: async function ({ args, message, event, envCommands, usersData, commandName, getLang }) {
-		const reward = envCommands[commandName].rewardFirstDay;
-		if (args[0] == "info") {
-			let msg = "";
-			for (let i = 1; i < 8; i++) {
-				const getCoin = Math.floor(reward.coin * (1 + 20 / 100) ** ((i == 0 ? 7 : i) - 1));
-				const getExp = Math.floor(reward.exp * (1 + 20 / 100) ** ((i == 0 ? 7 : i) - 1));
-				const day = i == 7 ? getLang("sunday") :
-					i == 6 ? getLang("saturday") :
-						i == 5 ? getLang("friday") :
-							i == 4 ? getLang("thursday") :
-								i == 3 ? getLang("wednesday") :
-									i == 2 ? getLang("tuesday") :
-										getLang("monday");
-				msg += `${day}: ${getCoin} coin, ${getExp} exp\n`;
-			}
-			return message.reply(msg);
-		}
+        const bgList = [
+            "https://i.imgur.com/wPCSbD3.png",
+            "https://i.imgur.com/8TK8F4U.png",
+            "https://i.imgur.com/NyQcaMC.png",
+            "https://i.imgur.com/ony8dOF.jpeg",
+            "https://i.imgur.com/IeHa3rx.png"
+        ];
 
-		const dateTime = moment.tz("Asia/Ho_Chi_Minh").format("DD/MM/YYYY");
-		const date = new Date();
-		const currentDay = date.getDay(); // 0: sunday, 1: monday, 2: tuesday, 3: wednesday, 4: thursday, 5: friday, 6: saturday
-		const { senderID } = event;
+        const userData = await usersData.get(senderID);
 
-		const userData = await usersData.get(senderID);
-		if (userData.data.lastTimeGetReward === dateTime)
-			return message.reply(getLang("alreadyReceived"));
+        if (!userData.data.dailyClaim || userData.data.dailyClaim.date !== dateTime) {
+            userData.data.dailyClaim = { date: dateTime, count: 0 };
+        }
 
-		const getCoin = Math.floor(reward.coin * (1 + 20 / 100) ** ((currentDay == 0 ? 7 : currentDay) - 1));
-		const getExp = Math.floor(reward.exp * (1 + 20 / 100) ** ((currentDay == 0 ? 7 : currentDay) - 1));
-		userData.data.lastTimeGetReward = dateTime;
-		await usersData.set(senderID, {
-			money: userData.money + getCoin,
-			exp: userData.exp + getExp,
-			data: userData.data
-		});
-		message.reply(getLang("received", getCoin, getExp));
-	}
+        if (userData.data.dailyClaim.count >= 5) {
+            return message.reply("🚫 𝗔𝗖𝗖𝗘𝗦𝗦 𝗗𝗘𝗡𝗜𝗘𝗗: 𝟱/𝟱 𝗟𝗶𝗺𝗶𝘁 𝗥𝗲𝗮𝗰𝗵𝗲𝗱!");
+        }
+
+        const getCoin = Math.floor(reward.coin * (1.2) ** (dayIndex - 1));
+        const getExp = Math.floor(reward.exp * (1.2) ** (dayIndex - 1));
+
+        userData.data.dailyClaim.count += 1;
+        const currentCount = userData.data.dailyClaim.count;
+
+        await usersData.set(senderID, {
+            money: userData.money + getCoin,
+            exp: userData.exp + getExp,
+            data: userData.data
+        });
+
+        try {
+            const userName = (userData.name).toUpperCase();
+            const avatarURL = `https://graph.facebook.com/${senderID}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
+            const randomBG = bgList[Math.floor(Math.random() * bgList.length)];
+
+            const cardUrl = `https://maybexenos.vercel.app/daily-reward/daily?background=${encodeURIComponent(randomBG)}&avatar=${encodeURIComponent(avatarURL)}&text1=${encodeURIComponent(userName)}&text2=CLAIM+${currentCount}/5&text3=%2B${getCoin}+COIN`;
+
+            const imageStream = (await axios.get(cardUrl, { responseType: 'stream' })).data;
+
+            return message.reply({
+                attachment: imageStream
+            });
+        } catch (err) {
+            return message.reply(`✅ +${getCoin} Coins Successfully Claimed!`);
+        }
+    }
 };
